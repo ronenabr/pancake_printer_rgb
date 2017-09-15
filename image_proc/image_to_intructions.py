@@ -39,11 +39,9 @@ def seperate_colors(img):
     pile = []
     for color in colorspace: 
         color_norm = np.linalg.norm(color)
-        print "Color norm ", color , color_norm
-        dist_map = (img * color).sum(axis=2)/((img**2).sum(axis=2))
-        dist_map = dist_map/color_norm
+        dist_map = (img * color).sum(axis=2)/(np.sqrt((img**2).sum(axis=2)) * color_norm+10e-8)
         pile.append(dist_map)
-        if debug:
+        if debug_graph:
             plt.figure()
             plt.title("projection on color %s" % str(color))
             plt.imshow(dist_map, cmap=plt.cm.gray, vmin=0, vmax=1)
@@ -51,7 +49,7 @@ def seperate_colors(img):
     
     pile = np.dstack(pile)
     ishape = np.argmax(pile,axis=2)
-    if debug:
+    if debug_graph:
         plt.figure()
         plt.title("max on all layers")
         plt.imshow(ishape)
@@ -130,30 +128,40 @@ def path_to_instruction(path):
 if __name__ ==  "__main__":
     import sys
     image_name = sys.argv[1]
-    switch =  True
+    switch =  False
     if len(sys.argv)>2:
         if sys.argv[2] == "s":
             switch = True
     img = imread(image_name).astype("float32")/255
+    if debug_graph:
+        plt.figure()
+        plt.imshow(img)
+        plt.colorbar()
+        plt.title("Original image")
+    
     scale = 10
     if switch:
         img = 1-img;
         print "Switching.."
 
     # img[img==0] = 0.01        
-    img = tf.resize(img, (img.shape[0]/scale, img.shape[1]/scale,3), order=0) # order=0, Nearest-neighbor interpolation
+    # img = tf.resize(img, (img.shape[0]/scale, img.shape[1]/scale,3), order=0) # order=0, Nearest-neighbor interpolation
+    # norm = np.linalg.norm(img,axis=2)
+    # norm = np.dstack([norm]*3) + 10e-5
+    # img = img/norm
 
 
 
     print "Reading ", image_name, img.shape
 
-    if debug:
+    if debug_graph:
         plt.figure()
         plt.imshow(img)
         plt.colorbar()
         plt.title("Original image")
     print img.shape
     layers = seperate_colors(img)
+    plt.show()
     print layers.shape
     for layer_idx in range(layers.max()):
         layer_img = layers==layer_idx 
@@ -164,6 +172,7 @@ if __name__ ==  "__main__":
             plt.imshow(layer_img, cmap=plt.cm.gray)
             print layer_img
             plt.colorbar()        
+        layer_img = tf.resize(layer_img, (layer_img.shape[0]/scale, layer_img.shape[1]/scale), order=0) # order=0, Nearest-neighbor interpolation                    
         bulk_edge = generage_path(layer_img)
         if bulk_edge.shape[0] == 0:
             continue 
